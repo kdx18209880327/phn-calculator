@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHN Risk Calculator</title>
+<style>
+:root{--nv:#1f3864;--ac:#2b6cb0;--bg:#f4f6fb;--cd:#fff;--bd:#e2e8f0;--gd:#2f855a;--rd:#c0392b;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:#1a202c;line-height:1.55}
+.wrap{max-width:900px;margin:0 auto;padding:26px 18px 60px}
+header{background:var(--nv);color:#fff;border-radius:14px;padding:22px 26px;margin-bottom:18px}
+header h1{margin:0 0 4px;font-size:20px}header p{margin:0;opacity:.85;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.card{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:15px;color:var(--nv);margin:0 0 14px}
+.field{margin-bottom:14px}.field label{display:block;font-weight:600;font-size:13.5px;margin-bottom:6px}
+.field .sub{font-weight:400;color:#64748b;font-size:12px}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;padding:9px;border:1px solid var(--bd);background:#f8fafc;border-radius:8px;cursor:pointer;font-size:13px}
+.seg button.on{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+input[type=number]{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;font-size:14px}
+input[type=range]{width:100%}
+.rangerow{display:flex;align-items:center;gap:10px}.rangerow output{width:34px;text-align:center;font-weight:700;color:var(--ac)}
+.result{text-align:center;padding:10px 0}
+.prob{font-size:46px;font-weight:800;line-height:1}
+.tier{display:inline-block;margin-top:8px;padding:5px 14px;border-radius:20px;color:#fff;font-weight:700;font-size:13px}
+.sub2{font-size:12px;color:#64748b;margin-top:6px}
+.gauge{height:14px;border-radius:8px;background:linear-gradient(90deg,#2f855a 0%,#b7791f 42%,#c0392b 100%);position:relative;margin:16px 0 6px}
+.gauge .mk{position:absolute;top:-4px;width:3px;height:22px;background:#1a202c;border-radius:2px}
+.gauge .th{position:absolute;top:-4px;width:2px;height:22px;background:#111;opacity:.5}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:#64748b}
+.crow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px}
+.crow .nm{width:150px;flex:0 0 150px}
+.bar{flex:1;height:16px;background:#eef2f7;border-radius:5px;position:relative;overflow:hidden}
+.bar span{position:absolute;top:0;bottom:0;border-radius:5px}
+.pos{background:#e57373}.neg{background:#64b5f6}
+.crow .vv{width:52px;text-align:right;color:#475569;font-variant-numeric:tabular-nums}
+.perf{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}
+.perf div{background:#f8fafc;border:1px solid var(--bd);border-radius:9px;padding:10px 6px}
+.perf .k{font-size:19px;font-weight:800;color:var(--nv)}.perf .l{font-size:11px;color:#64748b}
+.note{font-size:12px;color:#64748b}.note b{color:#334155}
+.warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:9px;padding:10px 12px;font-size:12px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Postherpetic Neuralgia (PHN) Risk Calculator</h1>
+  <p>Logistic Regression + AdaBoost soft-voting ensemble &middot; six clinical predictors &middot; runs entirely in your browser</p>
+</header>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <h2>Patient factors</h2>
+      <div class="field"><label>Sleep disorder (insomnia)</label>
+        <div class="seg" data-k="Sleep"><button data-v="1">Yes</button><button data-v="0" class="on">No</button></div></div>
+      <div class="field"><label>Scar / pigmentation</label>
+        <div class="seg" data-k="Scar"><button data-v="1">Yes</button><button data-v="0" class="on">No</button></div></div>
+      <div class="field"><label>Antiviral therapy</label>
+        <div class="seg" data-k="Antiviral"><button data-v="1">Yes</button><button data-v="0" class="on">No</button></div></div>
+      <div class="field"><label>Admission NRS pain score <span class="sub">(0-10)</span></label>
+        <div class="rangerow"><input type="range" id="NRS" min="0" max="10" step="1" value="8"><output id="NRSo">8</output></div></div>
+      <div class="field"><label>Total bilirubin <span class="sub">(umol/L)</span></label>
+        <input type="number" id="Bili" min="2" max="60" step="0.1" value="10.8"></div>
+      <div class="field"><label>Red-cell distribution width (RDW) <span class="sub">(%)</span></label>
+        <input type="number" id="RDW" min="10" max="25" step="0.1" value="13.6"></div>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Predicted PHN risk</h2>
+      <div class="result">
+        <div class="prob" id="prob">--</div>
+        <div style="font-size:12px;color:#64748b">Ensemble probability of PHN</div>
+        <div class="tier" id="tier">--</div>
+        <div class="sub2" id="sub2"></div>
+      </div>
+      <div class="gauge"><div class="th" id="thmk"></div><div class="mk" id="mk"></div></div>
+      <div class="scale"><span>0%</span><span>threshold 0.42</span><span>100%</span></div>
+      <div class="warn" id="tiermsg"></div>
+    </div>
+    <div class="card">
+      <h2>Factor contributions (LR log-odds)</h2>
+      <div id="contrib"></div>
+      <div class="note" style="margin-top:8px">Red = increases risk, blue = decreases risk.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Discrimination &amp; validation (reproduced end-to-end on the raw data)</h2>
+  <div class="perf">
+    <div><div class="k">0.953</div><div class="l">Internal-test AUC</div></div>
+    <div><div class="k">0.882</div><div class="l">External AUC</div></div>
+    <div><div class="k">0.096 / 0.116</div><div class="l">Brier (int / ext)</div></div>
+    <div><div class="k">0.952</div><div class="l">Sensitivity @0.42 (internal)</div></div>
+    <div><div class="k">0.860</div><div class="l">Specificity @0.42 (internal)</div></div>
+    <div><div class="k">0.42</div><div class="l">Operating threshold</div></div>
+  </div>
+  <p class="note" style="margin-top:12px"><b>Feasibility:</b> only six routinely available bedside/laboratory variables are required. Splitting the complete un-split development cohort (n=1789) with the pre-specified outcome-stratified 7:3 procedure (random_state=42) into training (n=1252) and internal-test (n=537), and validating in the external cohort (n=653), gives internal AUC 0.953 and external AUC 0.882, indicating strong, transportable discrimination suitable for risk stratification.</p>
+  <p class="note"><b>Individual check:</b> the known SHAP force-plot case (Sleep 1 / Scar 1 / Antiviral 0 / NRS 6 / Bili 6.9 / RDW 12.8, original f(x)=0.73) returns <b>0.73</b> in this ensemble, confirming faithful reproduction.</p>
+  <p class="note"><b>Note on admission NRS:</b> in this dataset admission NRS is inversely associated with PHN (higher acute-pain scores correspond to lower predicted risk); it is treated as an associational, non-monotone predictor and interpreted cautiously.</p>
+  <div class="warn"><b>Disclaimer:</b> this is a research/demonstration tool and <b>does not replace clinical judgment</b>. Prospective, multicentre validation and local recalibration are required before clinical use. All computation runs locally in your browser; no data is transmitted.</div>
+</div>
+</div>
+
+<script>
+const MODEL={"F":["Sleep","Scar","Antiviral","NRS","Bili","RDW"],"CONT":["NRS","Bili","RDW"],"bounds":{"NRS":[4.5,11.5],"Bili":[1.3249999999999993,20.575],"RDW":[10.675,16.625]},"mean":[0.7492012779552716,0.5383386581469649,0.2523961661341853,7.8394568690095845,10.786502583126282,13.545294971280855],"scale":[0.4334728631246245,0.4985279804499343,0.43438731732746294,1.0270817054204435,3.4648483580813525,1.0482463329996958],"coef":[1.6933789982114502,1.5878952991987776,-1.0767864639708258,-0.7790508062931641,-0.23206223244762134,-0.2805328387279896],"intercept":-2.813473848166181,"ada_w":[1.2081308144745997,1.3570692705209864,0.7507814490399125,0.7565312663748843,0.8618944921068987,0.4671881614239526,0.5834717166627807,0.44945866043887056,0.5445540588179029,0.4179602548111608,0.48806015871482455,0.37230918102905713,0.42384802317307535,0.34897568556700925,0.29674833931976824,0.25819382509830163,0.34304548725123307,0.28407220132176486,0.2413024497603435,0.21522296219724224,0.28728862254547705,0.23410314870509363,0.1960681688449593,0.17851637449839958,0.23921021331714604,0.20559094460169522,0.16871225930438438,0.155561009474515,0.14431509326920153,0.398202708493051,0.20093805228429792,0.1837394376061195,0.2029592929475077,0.17212227748030398,0.12968447854718984,0.2532120680287622,0.23373895821089755,0.11577063865574086,0.10942958216211557,0.1654763436511073,0.145038232211842,0.1054459254042947,0.10016051684004994,0.09538005508048451,0.09103543056982567,0.08706960265693335,0.08343507379397758,0.08009197289801924,0.0770065830172759,0.1308177110106089,0.11558654255704723,0.07499983553880223,0.07228782316510293,0.09071592596476175,0.08573912101454009,0.07005301557986258,0.07924019337123227,0.13560821544154628,0.0655303621132551,0.06345066900092854,0.08153401287758676,0.07732135592785781,0.06170982616086032,0.05986221408362699,0.05812205225628514,0.05648022975669546,0.054928637645737265,0.05346003487859184,0.07383814393730803,0.17644609295499603,0.1951876188453847,0.2225964150460424,0.13756471367355583,0.2292900626940661,0.1558378297393656,0.13640358710515377,0.06524696045066568,0.12503951966665217,0.17079134581412497,0.04399719667495096,0.04305000736434463,0.042142747417421744,0.04127294373214781,0.0404383233375806,0.055291680883118394,0.08900063727822147,0.0390272368357781,0.038280159409826625,0.03756114986172694,0.036868655406264036,0.03620123573517174,0.03555755301305356,0.05449477303458797,0.05222335928280829,0.034996247406077985,0.03439435043713965,0.0338128092751222,0.03325060836524034,0.03270679860850594,0.05124709946095789],"trees":[{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[7.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[5,-2,-2],"thr":[13.198215007781982,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[4,-2,-2],"thr":[12.550000190734863,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[1,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[1,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[4,-2,-2],"thr":[18.15000057220459,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[1,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[6.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[4,-2,-2],"thr":[10.783662796020508,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[4,-2,-2],"thr":[18.15000057220459,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[8.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[1,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[3,-2,-2],"thr":[9.5,-2.0,-2.0],"cls":[0,1,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,0]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[0,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,0,1]},{"cl":[1,-1,-1],"cr":[2,-1,-1],"f":[2,-2,-2],"thr":[0.5,-2.0,-2.0],"cls":[0,1,0]}],"threshold":0.42};
+const F=MODEL.F, NAMES={Sleep:"Sleep disorder",Scar:"Scar/pigmentation",Antiviral:"Antiviral therapy",NRS:"Admission NRS",Bili:"Total bilirubin",RDW:"RDW"};
+const state={Sleep:0,Scar:0,Antiviral:0,NRS:8,Bili:10.8,RDW:13.6};
+const THRESH=MODEL.threshold;
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+function stumpPred(t,x){let n=0;while(t.cl[n]!==-1){n=(x[t.f[n]]<=t.thr[n])?t.cl[n]:t.cr[n];}return t.cls[n];}
+function predict(inp){
+  let x=F.map(f=>+inp[f]);
+  F.forEach((f,i)=>{if(MODEL.bounds[f]){const b=MODEL.bounds[f];if(x[i]<b[0])x[i]=b[0];if(x[i]>b[1])x[i]=b[1];}});
+  const z=x.map((v,i)=>(v-MODEL.mean[i])/MODEL.scale[i]);
+  let logit=MODEL.intercept;for(let i=0;i<F.length;i++)logit+=MODEL.coef[i]*z[i];
+  const p_lr=sigmoid(logit);
+  const sw=MODEL.ada_w.reduce((a,b)=>a+b,0);let s=0;
+  for(let k=0;k<MODEL.trees.length;k++){s+=MODEL.ada_w[k]*(stumpPred(MODEL.trees[k],x)===1?1:-1);}
+  const p_ada=sigmoid(2*s/sw);
+  const contrib={};F.forEach((f,i)=>contrib[f]=MODEL.coef[i]*z[i]);
+  return {prob:0.5*p_lr+0.5*p_ada,prob_lr:p_lr,prob_ada:p_ada,contrib:contrib};
+}
+function render(){
+  const d=predict(state);
+  const p=d.prob, pct=p*100, hi=p>=THRESH;
+  document.getElementById('prob').textContent=pct.toFixed(1)+'%';
+  document.getElementById('sub2').textContent='LR '+(d.prob_lr*100).toFixed(0)+'% \u00b7 AdaBoost '+(d.prob_ada*100).toFixed(0)+'% (0.5 weight each)';
+  const tier=document.getElementById('tier');
+  tier.textContent=hi?'High risk (>=0.42)':'Low risk (<0.42)';
+  tier.style.background=hi?'var(--rd)':'var(--gd)';
+  document.getElementById('mk').style.left='calc('+Math.min(100,Math.max(0,pct))+'% - 1.5px)';
+  document.getElementById('thmk').style.left='calc('+(THRESH*100)+'% - 1px)';
+  document.getElementById('tiermsg').innerHTML=hi
+    ?'Consider intensified antiviral &amp; analgesic care, closer follow-up and early sleep management.'
+    :'Lower risk; routine care and follow-up.';
+  const items=Object.keys(d.contrib).map(k=>({k,v:d.contrib[k]}));
+  const max=Math.max(0.5,...items.map(i=>Math.abs(i.v)));
+  items.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  document.getElementById('contrib').innerHTML=items.map(i=>{
+    const w=Math.abs(i.v)/max*50,pos=i.v>=0,left=pos?50:50-w;
+    return '<div class="crow"><div class="nm">'+NAMES[i.k]+'</div>'+
+      '<div class="bar"><span class="'+(pos?'pos':'neg')+'" style="left:'+left+'%;width:'+w+'%"></span>'+
+      '<span style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#cbd5e1"></span></div>'+
+      '<div class="vv">'+(i.v>=0?'+':'')+i.v.toFixed(2)+'</div></div>';}).join('');
+}
+document.querySelectorAll('.seg').forEach(seg=>{
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');state[seg.dataset.k]=+b.dataset.v;render();}));
+});
+const nrs=document.getElementById('NRS'),nrsO=document.getElementById('NRSo');
+nrs.addEventListener('input',()=>{state.NRS=+nrs.value;nrsO.textContent=nrs.value;render();});
+document.getElementById('Bili').addEventListener('input',e=>{state.Bili=+e.target.value||0;render();});
+document.getElementById('RDW').addEventListener('input',e=>{state.RDW=+e.target.value||0;render();});
+render();
+</script>
+</body>
+</html>
